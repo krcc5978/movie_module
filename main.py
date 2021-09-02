@@ -61,8 +61,6 @@ def video_method(args, file_path):
 
     for i in tqdm(range(start, end)):  # フレーム数分回す
 
-        ret = cap.grab()
-
         if ret is False:
             break
 
