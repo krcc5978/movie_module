@@ -16,43 +16,86 @@ parser.add_argument('--step', help='スキップフレーム', default=1, type=i
 
 parser.add_argument('--show', help='表示フラグ', action='store_true')
 
-
 parser.add_argument('--out_dir', help='出力ディレクトリ', default='./')
-parser.add_argument('--out_movie', help='動画出力場所')
+parser.add_argument('--out_movie', help='動画ファイルパス')
 parser.add_argument('--out_file', help='分割ファイル場所', type=bool)
 parser.add_argument('--out_size', help='動画サイズ')
+parser.add_argument('--fps', help='フレームレート', default=None, type=int)
 parser.add_argument('--movie_extension', help='動画ファイル拡張子', default='mp4')
 parser.add_argument('--img_extension', help='画像ファイル拡張子', default='png')
 
 args = parser.parse_args()
 
 
-def image_method(args, file_path):
-    image = cv2.imread(file_path)
+def make_video_writer(fps, size):
+    fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')  # ファイル形式(ここではmp4)
+    video_writer = cv2.VideoWriter(f'{args.out_dir}/{args.out_movie}.{args.movie_extension}', fmt, fps, size)  # ライター作成
+
+    return video_writer
+
+
+def arg_value_check(val, default):
+    if val is None:
+        return default
+    else:
+        return val
+
+
+def common_process(image, video_writer, fps, size):
+    if args.out_size is not None:
+        image = cv2.resize(image, eval(args.out_size))
+
+    if args.out_movie is not None:
+        if video_writer is None:
+            video_writer = make_video_writer(fps, size)
+        else:
+            video_writer.write(image)
 
     if args.show:
         cv2.imshow(f'window', image)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
+
+    return video_writer
 
 
-def video_method(args, file_path):
-    cap = cv2.VideoCapture(file_path)
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+def directroy_method(directory_path):
+    '''
+    ディレクトリに対する処理
+    :param directory_path: ディレクトリパス
+    :return:
+    '''
+    file_path_list = os.listdir(directory_path)
+    fps = arg_value_check(args.fps, 10)
+
+    video_writer = None
+    os.makedirs(args.out_dir, exist_ok=True)
+    for file_path in tqdm(file_path_list):
+        image = cv2.imread(directory_path + '\\' + file_path)
+        size = arg_value_check(args.out_size, (image.shape[1], image.shape[0]))
+        video_writer = common_process(image, video_writer, fps, size)
+
+    if args.out_movie is not None:
+        video_writer.release()
+
+
+def video_method(movie_path):
+    '''
+    動画ファイルに対する処理
+    :param movie_path: 動画ファイルパス
+    :return:
+    '''
+    cap = cv2.VideoCapture(movie_path)
+
+    size = arg_value_check(args.out_size,
+                           (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
+    fps = arg_value_check(args.fps, int(cap.get(cv2.CAP_PROP_FPS)))
+    end = arg_value_check(args.end, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
 
     start = args.start
-    end = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if args.end is not None:
-        end = args.end
     step = args.step
 
     video_writer = None
     os.makedirs(args.out_dir, exist_ok=True)
-
-    if args.out_movie is not None:
-        fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')  # ファイル形式(ここではmp4)
-        if args.out_size is not None:
-            size = eval(args.out_size)
-        video_writer = cv2.VideoWriter(f'{args.out_dir}/{args.out_movie}.{args.movie_extension}', fmt, int(cap.get(cv2.CAP_PROP_FPS)), size)  # ライター作成
 
     for _ in tqdm(range(0, start)):
         ret = cap.grab()
@@ -66,20 +109,13 @@ def video_method(args, file_path):
             if ret is False:
                 break
 
-            if args.show:
-                cv2.imshow(f'window', frame)
-                cv2.waitKey(1)
-
-            if args.out_size is not None:
-                frame = cv2.resize(frame, size)
-
-            if args.out_movie is not None:
-                video_writer.write(frame)
+            video_writer = common_process(frame, video_writer, fps, size)
 
             if args.out_file:
                 digit = len(str(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
-                file_name = re.split(r"[/\\.]", file_path)
+                file_name = re.split(r"[/\\.]", movie_path)
                 cv2.imwrite(f'{args.out_dir}/{file_name[-2]}_{str(i).zfill(digit)}.{args.img_extension}', frame)
+
         else:
             ret = cap.grab()
             if ret is False:
@@ -89,30 +125,35 @@ def video_method(args, file_path):
         video_writer.release()
 
 
+def image_method(file_path):
+    image = cv2.imread(file_path)
+
+    if args.show:
+        cv2.imshow(f'window', image)
+        cv2.waitKey(0)
+
+
 def file_choice(file_path):
     input_ext = file_path.split('.')[-1]
     if input_ext == 'mp4':
-        video_method(args, file_path)
+        video_method(file_path)
     elif input_ext == 'avi':
-        video_method(args, file_path)
+        video_method(file_path)
     elif input_ext == 'jpg':
-        image_method(args, file_path)
+        image_method(file_path)
     elif input_ext == 'png':
-        image_method(args, file_path)
+        image_method(file_path)
     else:
         print('入力形式が違います')
 
 
-def main(args):
+def main():
     input_path = args.input
-
     if os.path.isdir(input_path):
-        file_path_list = os.listdir(input_path)
-        for file_path in file_path_list:
-            file_choice(input_path + '\\' + file_path)
+        directroy_method(input_path)
     else:
         file_choice(input_path)
 
 
 if __name__ == '__main__':
-    main(args)
+    main()
