@@ -18,7 +18,7 @@ parser.add_argument('--show', help='表示フラグ', action='store_true')
 
 parser.add_argument('--out_dir', help='出力ディレクトリ', default='./')
 parser.add_argument('--out_movie', help='動画ファイルパス')
-parser.add_argument('--out_file', help='分割ファイル場所', action='store_true')
+parser.add_argument('--out_file', help='分割ファイルにするか', action='store_true')
 parser.add_argument('--out_size', help='動画サイズ')
 parser.add_argument('--fps', help='フレームレート', default=None, type=int)
 parser.add_argument('--movie_extension', help='動画ファイル拡張子', default='mp4')
